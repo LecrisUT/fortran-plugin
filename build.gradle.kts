@@ -5,6 +5,10 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
+import org.jetbrains.intellij.tasks.PatchPluginXmlTask
+import org.jetbrains.intellij.tasks.PrepareSandboxTask
+import org.jetbrains.intellij.tasks.PublishPluginTask
+import org.jetbrains.intellij.tasks.RunIdeTask
 
 fun properties(key: String) = providers.gradleProperty(key)
 fun environment(key: String) = providers.environmentVariable(key)
@@ -46,7 +50,7 @@ plugins {
 
 changelog {
     groups.empty()
-    repositoryUrl.set(properties("pluginRepositoryUrl"))
+    repositoryUrl.set(properties("pluginRepositoryUrl").get())
 }
 
 
@@ -95,9 +99,9 @@ allprojects {
             }
         }
         patchPluginXml {
-            version.set(properties("pluginVersion"))
-            sinceBuild.set(properties("pluginSinceBuild"))
-            untilBuild.set(properties("pluginUntilBuild"))
+            version.set(properties("pluginVersion").get())
+            sinceBuild.set(properties("pluginSinceBuild").get())
+            untilBuild.set(properties("pluginUntilBuild").get())
         }
 
         // All these tasks don't make sense for non-root subprojects
@@ -196,9 +200,9 @@ val Project.dependencyCachePath
 
 // Special module with run, build and publish tasks
 project(":plugin") {
-    version = properties("pluginVersion")
+    version = properties("pluginVersion").get()
     intellij {
-        pluginName.set(properties("pluginName").get())
+        pluginName.set("fortran-plugin")
         val pluginList = mutableListOf<String>(
 //            psiViewerPlugin,
         )
@@ -225,36 +229,37 @@ project(":plugin") {
 //        implementation(project(":grazie"))
     }
 
-//    // Collects all jars produced by compilation of project modules and merges them into singe one.
-//    // We need to put all plugin manifest files into single jar to make new plugin model work
-//    val mergePluginJarTask = task<Jar>("mergePluginJars") {
-//        duplicatesStrategy = DuplicatesStrategy.FAIL
-//        archiveBaseName.set(basePluginArchiveName)
-//
-//        exclude("META-INF/MANIFEST.MF")
-//        exclude("**/classpath.index")
-//
-//        val pluginLibDir by lazy {
-//            val sandboxTask = tasks.prepareSandbox.get()
-//            sandboxTask.destinationDir.resolve("${sandboxTask.pluginName.get()}/lib")
-//        }
-//
-//        val pluginJars by lazy {
-//            pluginLibDir.listFiles().orEmpty().filter { it.isPluginJar() }
-//        }
-//
-//        destinationDirectory.set(project.layout.dir(provider { pluginLibDir }))
-//
-//        doFirst {
-//            for (file in pluginJars) {
-//                from(zipTree(file))
-//            }
-//        }
-//
-//        doLast {
-//            delete(pluginJars)
-//        }
-//    }
+    // TODO: not sure how to handle this
+    // Collects all jars produced by compilation of project modules and merges them into singe one.
+    // We need to put all plugin manifest files into single jar to make new plugin model work
+    val mergePluginJarTask = task<Jar>("mergePluginJars") {
+        duplicatesStrategy = DuplicatesStrategy.FAIL
+        archiveBaseName.set(basePluginArchiveName)
+
+        exclude("META-INF/MANIFEST.MF")
+        exclude("**/classpath.index")
+
+        val pluginLibDir by lazy {
+            val sandboxTask = tasks.prepareSandbox.get()
+            sandboxTask.destinationDir.resolve("${sandboxTask.pluginName.get()}/lib")
+        }
+
+        val pluginJars by lazy {
+            pluginLibDir.listFiles().orEmpty().filter { it.isPluginJar() }
+        }
+
+        destinationDirectory.set(project.layout.dir(provider { pluginLibDir }))
+
+        doFirst {
+            for (file in pluginJars) {
+                from(zipTree(file))
+            }
+        }
+
+        doLast {
+            delete(pluginJars)
+        }
+    }
 
     // Add plugin sources to the plugin ZIP.
     // gradle-intellij-plugin will use it as a plugin sources if the plugin is used as a dependency
@@ -284,31 +289,32 @@ project(":plugin") {
             archiveBaseName.set(basePluginArchiveName)
         }
 
-        runIde { enabled = true }
-//        prepareSandbox {
-//            finalizedBy(mergePluginJarTask)
-//            enabled = true
-//        }
-
-//        buildSearchableOptions {
-//            // Force `mergePluginJarTask` be executed before `buildSearchableOptions`
-//            // Otherwise, `buildSearchableOptions` task can't load the plugin and searchable options are not built.
-//            // Should be dropped when jar merging is implemented in `gradle-intellij-plugin` itself
-//            dependsOn(mergePluginJarTask)
-//            enabled = properties("enableBuildSearchableOptions").get().toBoolean()
-//        }
-
-//        withType<PrepareSandboxTask> {
-//            dependsOn(named("compileNativeCode"))
-//
-//            // Copy native binaries
-//            from("${rootDir}/bin") {
-//                into("${pluginName.get()}/bin")
-//                include("**")
-//            }
-//        }
-
         runIde {
+//            dependsOn(mergePluginJarTask)
+            enabled = true
+        }
+        prepareSandbox {
+//            finalizedBy(mergePluginJarTask)
+            enabled = true
+        }
+
+        buildSearchableOptions {
+            // Force `mergePluginJarTask` be executed before `buildSearchableOptions`
+            // Otherwise, `buildSearchableOptions` task can't load the plugin and searchable options are not built.
+            // Should be dropped when jar merging is implemented in `gradle-intellij-plugin` itself
+//            dependsOn(mergePluginJarTask)
+            enabled = properties("enableBuildSearchableOptions").get().toBoolean()
+        }
+
+        withType<PrepareSandboxTask> {
+            // Copy native binaries
+            from("${rootDir}/bin") {
+                into("${pluginName.get()}/bin")
+                include("**")
+            }
+        }
+
+        withType<RunIdeTask> {
             // Default args for IDEA installation
             jvmArgs("-Xmx768m", "-XX:+UseG1GC", "-XX:SoftRefLRUPolicyMSPerMB=50")
 //            // Disable plugin auto reloading. See `com.intellij.ide.plugins.DynamicPluginVfsListener`
@@ -325,9 +331,9 @@ project(":plugin") {
             // jvmArgs("-Didea.l10n=true")
         }
 
-        patchPluginXml {
+        withType<PatchPluginXmlTask> {
 
-            val changelog = project.changelog // local variable for configuration cache compatibility
+//            val changelog = project.changelog // local variable for configuration cache compatibility
             pluginDescription.set(providers.fileContents(layout.projectDirectory.file("README.md")).asText.map {
                 // Extract the <!-- Plugin description --> section from README.md and provide for the plugin's manifest
                 val start = "<!-- Plugin description -->"
@@ -342,16 +348,16 @@ project(":plugin") {
             })
 
             // Get the latest available change notes from the changelog file
-            changeNotes.set(properties("pluginVersion").map { pluginVersion ->
-                with(changelog) {
-                    renderItem(
-                        (getOrNull(pluginVersion) ?: getUnreleased())
-                            .withHeader(false)
-                            .withEmptySections(false),
-                        Changelog.OutputType.HTML,
-                    )
-                }
-            })
+//            changeNotes.set(properties("pluginVersion").map { pluginVersion ->
+//                with(changelog) {
+//                    renderItem(
+//                        (getOrNull(pluginVersion) ?: getUnreleased())
+//                            .withHeader(false)
+//                            .withEmptySections(false),
+//                        Changelog.OutputType.HTML,
+//                    )
+//                }
+//            })
         }
 
         signPlugin {
@@ -360,7 +366,7 @@ project(":plugin") {
             password.set(environment("PRIVATE_KEY_PASSWORD"))
         }
 
-        publishPlugin {
+        withType<PublishPluginTask> {
             dependsOn("patchChangelog")
             token.set(environment("PUBLISH_TOKEN"))
             // The pluginVersion is based on the SemVer (https://semver.org) and supports pre-release labels, like 2.1.7-alpha.3
@@ -368,6 +374,16 @@ project(":plugin") {
             // https://plugins.jetbrains.com/docs/intellij/deployment.html#specifying-a-release-channel
             channels.set(properties("pluginVersion").map { listOf(it.split('-').getOrElse(1) { "default" }.split('.').first()) })
         }
+    }
+
+    // Generates event scheme for Rust plugin FUS events to `plugin/build/eventScheme.json`
+    task<RunIdeTask>("buildEventsScheme") {
+        dependsOn(tasks.prepareSandbox)
+        args("buildEventsScheme", "--outputFile=${buildDir.resolve("eventScheme.json").absolutePath}", "--pluginId=org.jetbrains.fortran")
+        // BACKCOMPAT: 2022.3. Update value to 231 and this comment
+        // `IDEA_BUILD_NUMBER` variable is used by `buildEventsScheme` task to write `buildNumber` to output json.
+        // It will be used by TeamCity automation to set minimal IDE version for new events
+        environment("IDEA_BUILD_NUMBER", "223")
     }
 }
 
