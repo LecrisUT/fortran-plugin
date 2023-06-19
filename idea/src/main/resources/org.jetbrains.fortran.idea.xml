@@ -1,0 +1,10 @@
+<idea-plugin package="org.jetbrains.fortran.idea">
+    <!--suppress PluginXmlValidity -->
+    <dependencies>
+        <plugin id="com.intellij.modules.java"/>
+    </dependencies>
+
+<!--    <extensions defaultExtensionNs="com.intellij">-->
+<!--        <projectStructureDetector implementation="org.jetbrains.fortran.idea.FortranProjectStructureDetector"/>-->
+<!--    </extensions>-->
+</idea-plugin>
