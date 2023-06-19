@@ -4,9 +4,15 @@ import org.jetbrains.grammarkit.tasks.GenerateParserTask
 import org.jetbrains.intellij.tasks.JarSearchableOptionsTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+fun properties(key: String) = providers.gradleProperty(key)
+fun environment(key: String) = providers.environmentVariable(key)
+
 val CI = System.getenv("CI") != null
 val clionVersion = "CL-${prop("clionVersion")}"
 val clionPlugins = listOf("com.intellij.cidr.base", "com.intellij.clion")
+
+group = properties("pluginGroup").get()
+version = properties("pluginVersion").get()
 
 plugins {
     idea
