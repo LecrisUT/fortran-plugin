@@ -1,0 +1,22 @@
+name: CI workflow
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    name: Run tests
+    strategy:
+      fail-fast: false
+      matrix:
+        base-ide: [ idea,clion ]
+        platform-version: [ 232 ]
+    uses: ./.github/workflows/test.yaml
+    with:
+      base-ide: ${{ matrix.base-ide }}
+      platform-version: ${{ matrix.platform-version }}
+    permissions:
+      contents: write
+      checks: write
+      pull-requests: write
