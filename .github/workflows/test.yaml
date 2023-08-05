@@ -176,7 +176,9 @@ jobs:
           cache-default-branch-only: true
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
-
+      - uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
   # Run plugin structure verification along with IntelliJ Plugin Verifier
   verify:
     name: Verify plugin
