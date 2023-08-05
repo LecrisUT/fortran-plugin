@@ -72,7 +72,7 @@ jobs:
 
       # Build plugin
       - name: Build plugin
-        run: ./gradlew buildPlugin
+        run: ./gradlew :plugin:buildPlugin
 
       # Prepare plugin archive content for creating artifact
       - name: Prepare Plugin Artifact
@@ -90,7 +90,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.artifact.outputs.filename }}
-          path: ./build/distributions/content/*/*
+          path: ./plugin/build/distributions/content/*/*
 
   # Run tests and upload a code coverage report
   test:
@@ -98,6 +98,13 @@ jobs:
     needs: [ build ]
     runs-on: ubuntu-latest
     steps:
+
+      # Free GitHub Actions Environment Disk Space
+      - name: Maximize Build Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
 
       # Check out current repository
       - name: Fetch Sources
@@ -143,6 +150,13 @@ jobs:
       checks: write
       pull-requests: write
     steps:
+
+      # Free GitHub Actions Environment Disk Space
+      - name: Maximize Build Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
 
       # Check out current repository
       - name: Fetch Sources
